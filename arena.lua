@@ -43,7 +43,8 @@ local arenaY = 40
 local arenaSize = 50
 local wallRadius = 40
 local wallRadiusSq = wallRadius * wallRadius
-local floorY = -math.floor(wallRadius * 0.3)
+local floorY = -5
+local fightFloorY = -25
 
 local arenaPos
 for c in boundless.connections() do
@@ -52,7 +53,7 @@ for c in boundless.connections() do
         local playerPos = e:get_position()
         arenaPos = boundless.wrap(boundless.UnwrappedBlockCoord(
             math.floor(playerPos.x / 128) * 128 + 64,
-            0,
+            arenaY,
             math.floor(playerPos.z / 128) * 128 + 64))
 
         setBlock(arenaPos.x - 10, arenaY + floorY, arenaPos.z, boundless.blockTypes.MANTLE_DEFAULT_BASE, 0)
@@ -88,17 +89,21 @@ function createArena()
                 for z = -arenaSize, arenaSize do
                     local dXZ = x*x + z*z
                     local d = y*y + dXZ
-                    if d < wallRadiusSq or (dXZ < 25) then
+                    if d < wallRadiusSq then
                         if y <= floorY then
-                            if (x % 8 == 2 or x % 8 == 6) and (z % 8 == 2 or z % 8 == 6) then
+                            if y == floorY - 2 then
+                                setArenaBlock(x, y, z, boundless.blockTypes.MANTLE_DEFAULT_BASE, 228)
+                            elseif y > fightFloorY and y < floorY - 2 then
+                                setArenaBlock(x, y, z, boundless.blockTypes.AIR, 0)
+                            elseif y <= fightFloorY then
+                                setArenaBlock(x, y, z, boundless.blockTypes.ROCK_MARBLE_REFINED, 228)
+                            elseif (x % 8 == 2 or x % 8 == 6) and (z % 8 == 2 or z % 8 == 6) then
                                 setArenaBlock(x, y, z, boundless.blockTypes.ROCK_MARBLE_DECORATIVE_FRIEZE1, 228)
                             elseif (x % 8 == 0) or (z % 8 == 0) then
                                 setArenaBlock(x, y, z, boundless.blockTypes.ROCK_MARBLE_DECORATIVE_FRIEZE0, 110)
                             else
                                 setArenaBlock(x, y, z, boundless.blockTypes.ROCK_MARBLE_REFINED, 228)
                             end
-                        elseif y >= 10 and y < 12 then
-                            setArenaBlock(x, y, z, boundless.blockTypes.GLASS_DEFAULT_PLAIN, 0)
                         else
                             setArenaBlock(x, y, z, boundless.blockTypes.AIR, 0)
                         end
@@ -117,6 +122,7 @@ function createArena()
         setArenaBlock(0, floorY, 0, boundless.blockTypes.SOIL_SILTY_BASE_DUGUP, 0)
         spawnTree(arenaPos.x, arenaY + floorY, arenaPos.z)
 
+        -- To fight teleport pad
         for x = -1, 1 do
             for z = -1, 1 do
                 setArenaBlock(32 + x, floorY, z, boundless.blockTypes.MANTLE_DEFAULT_BASE, fightTeleportColor)
@@ -135,12 +141,25 @@ end
 
 createArena()
 
+wildstock_lvl1 = { archetype = boundless.archetypes.wildstock, add_block_on_death={ boundless.blockTypes.ROCK_METAMORPHIC_BASE, boundless.blockTypes.ROCK_BOULDER } }
+
+waves = {}
+waves[1] = { creatures={ { wildstock_lvl1 , 1 } } }
+
+local currentWave = 1
 function startFight()
     print("Trigger start fight")
     for c in boundless.connections() do
         local e = boundless.getEntity(c:get_id())
         if e then
-            e:set_position(boundless.wrap(boundless.UnwrappedWorldPosition(arenaPos.x, arenaY + 13, arenaPos.z)))
+            e:set_position(boundless.wrap(boundless.UnwrappedWorldPosition(arenaPos.x, arenaY - fightFloorY, arenaPos.z)))
+
+            wave = waves[currentWave]
+            for i = 1, #wave.creatures do
+                local creature = wave.creatures[i]
+                local count = creature[1]
+                boundless.spawnCreature(creature[0].archetype, boundless.wrap(boundless.UnwrappedWorldPosition(arenaPos.x + 2, arenaY - fightFloorY, arenaPos.z), 0))
+            end
         end
     end
 end
